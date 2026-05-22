@@ -1162,7 +1162,7 @@ function StoryRow({ story, selected, darkMode, onClick }) {
         <span className="text-[9px] px-1.5 py-0.5 rounded border border-neutral-200 dark:border-neutral-700 text-neutral-500">{story.tier}</span>
       </div>
       <p className="text-[11px] mt-1.5 italic truncate text-neutral-500 dark:text-neutral-400">→ {story.outcomes?.[0] || story.demoAngle}</p>
-    </div>
+    </button>
   );
 }
 
