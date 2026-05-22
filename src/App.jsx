@@ -754,6 +754,12 @@ export default function App() {
     setSelectedFamily("All");
     setSelectedTier("All");
     setSelectedModule("All");
+    setStoryBoardIds([]);
+    setActiveFolder("recommend");
+    setCopyMode("talkTrack");
+    setVoiceMode("workjam");
+    setMobileView("list");
+    setSelectedStory(STORIES_DATA[0]);
   }
 
   const SelectedPersonaIcon = selectedPersona === "All" ? Users : PERSONAS.find((p) => p.id === selectedPersona)?.icon || Users;
@@ -950,6 +956,18 @@ export default function App() {
                       </div>
                     </div>
                   </DetailCard>
+                )}
+
+                {storyBoardStories.length > 1 && (
+                  <StoryBoardColumns
+                    stories={storyBoardStories}
+                    combinedCopy={storyBoardCopy}
+                    copiedId={copiedId}
+                    onCopy={handleCopy}
+                    onOpenStory={openStory}
+                    onRemoveStory={removeFromStoryBoard}
+                    onClear={clearStoryBoard}
+                  />
                 )}
 
                 <DetailCard title="Why This Matched" icon={Sparkles}>
@@ -1165,6 +1183,187 @@ function StoryRow({ story, selected, darkMode, onClick }) {
     </button>
   );
 }
+
+
+function StoryBoardColumns({ stories, combinedCopy, copiedId, onCopy, onOpenStory, onRemoveStory, onClear }) {
+  const discoveryQuestions = stories.flatMap((story) => [
+    `How are you handling ${story.primaryPains?.[0]?.toLowerCase() || "this frontline challenge"} today?`,
+    `Where does ${story.company}'s pattern show up in your operating model?`
+  ]).slice(0, 6);
+
+  return (
+    <div className="rounded-2xl border border-blue-200 dark:border-blue-500/30 bg-blue-50/50 dark:bg-blue-500/10 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+          <h3 className="text-sm font-extrabold text-neutral-900 dark:text-white tracking-tight">
+            Storyboard Board
+          </h3>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+            Compare selected stories side-by-side, then use the final column as the combined narrative.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => onCopy(combinedCopy, "storyboard-board-copy")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${
+              copiedId === "storyboard-board-copy"
+                ? "bg-emerald-500 text-white"
+                : "bg-blue-500 hover:bg-blue-600 text-white"
+            }`}
+          >
+            {copiedId === "storyboard-board-copy" ? <Check size={12} /> : <Copy size={12} />}
+            {copiedId === "storyboard-board-copy" ? "Copied Board" : "Copy Board"}
+          </button>
+          <button
+            onClick={onClear}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:bg-white dark:hover:bg-neutral-900"
+          >
+            Clear Board
+          </button>
+        </div>
+      </div>
+
+      <div
+        className="grid gap-3 overflow-x-auto pb-2"
+        style={{
+          gridTemplateColumns: `repeat(${stories.length}, minmax(260px, 1fr)) minmax(320px, 1.15fr)`
+        }}
+      >
+        {stories.map((story, index) => (
+          <div
+            key={story.id}
+            className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 p-3 min-w-[260px] flex flex-col gap-3"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[10px] font-mono text-blue-500 font-bold uppercase tracking-wider">
+                  Column {index + 1}
+                </p>
+                <button onClick={() => onOpenStory(story)} className="text-left">
+                  <h4 className="text-sm font-extrabold text-neutral-900 dark:text-white leading-tight mt-1">
+                    {story.company}
+                  </h4>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 line-clamp-2 mt-0.5">
+                    {story.name}
+                  </p>
+                </button>
+              </div>
+              <button
+                onClick={() => onRemoveStory(story.id)}
+                className="text-neutral-400 hover:text-red-500 shrink-0"
+                title="Remove from board"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 font-mono mb-1">
+                Best Use
+              </p>
+              <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed">
+                {story.demoAngle}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 font-mono mb-1">
+                Proof
+              </p>
+              <ul className="space-y-1">
+                {(story.outcomes || []).slice(0, 3).map((outcome, outcomeIndex) => (
+                  <li key={outcomeIndex} className="text-xs text-neutral-700 dark:text-neutral-300 leading-snug flex gap-1.5">
+                    <span className="text-emerald-500 font-bold">•</span>
+                    <span>{outcome}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 font-mono mb-1">
+                Discovery Angle
+              </p>
+              <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed">
+                How are you currently solving {story.primaryPains?.[0]?.toLowerCase() || "this problem"}?
+              </p>
+            </div>
+          </div>
+        ))}
+
+        <div className="rounded-xl border border-blue-200 dark:border-blue-500/30 bg-white dark:bg-neutral-950 p-3 min-w-[320px] flex flex-col gap-3">
+          <div>
+            <p className="text-[10px] font-mono text-blue-500 font-bold uppercase tracking-wider">
+              Combined Story
+            </p>
+            <h4 className="text-sm font-extrabold text-neutral-900 dark:text-white mt-1">
+              Summary Narrative
+            </h4>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 leading-relaxed">
+              Use this as the bridge across the selected proof points.
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 p-3">
+            <p className="text-xs text-neutral-800 dark:text-neutral-200 leading-relaxed">
+              These stories work together because they show the same pattern from different angles:
+              frontline work breaks down when communication, workflow, learning, scheduling, and proof
+              live in separate places. WorkJam creates the operating layer that connects the right audience,
+              the right action, and the right evidence of execution.
+            </p>
+          </div>
+
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 font-mono mb-1">
+              Combined Discovery
+            </p>
+            <ol className="space-y-1 list-decimal list-inside">
+              {discoveryQuestions.map((question, index) => (
+                <li key={index} className="text-xs text-neutral-700 dark:text-neutral-300 leading-snug">
+                  {question}
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 font-mono mb-1">
+              Suggested Flow
+            </p>
+            <ol className="space-y-1 list-decimal list-inside">
+              {[
+                "Start with the operating problem.",
+                "Use the first story as anchor proof.",
+                "Use the second story to show a second buyer angle.",
+                "Use the third or fourth story as expansion proof.",
+                "Close with WorkJam as the frontline execution layer."
+              ].map((step, index) => (
+                <li key={index} className="text-xs text-neutral-700 dark:text-neutral-300 leading-snug">
+                  {step}
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          <div className="mt-auto">
+            <button
+              onClick={() => onCopy(combinedCopy, "storyboard-summary-copy")}
+              className={`w-full py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 ${
+                copiedId === "storyboard-summary-copy"
+                  ? "bg-emerald-500 text-white"
+                  : "bg-blue-500 hover:bg-blue-600 text-white"
+              }`}
+            >
+              {copiedId === "storyboard-summary-copy" ? <Check size={12} /> : <Copy size={12} />}
+              {copiedId === "storyboard-summary-copy" ? "Copied Summary" : "Copy Combined Summary"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function Badge({ label, tone }) {
   let className = "bg-neutral-50 text-neutral-600 border-neutral-200 dark:bg-neutral-900 dark:text-neutral-300 dark:border-neutral-800";
