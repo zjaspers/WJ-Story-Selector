@@ -600,8 +600,3 @@ export const STORIES_DATA = [
     "tags": ["compliance", "habit_formation"]
   }
 ]
-
-js = "export const STORIES_DATA = " + json.dumps(stories, indent=2, ensure_ascii=False) + ";\n"
-path = Path("/mnt/data/storiesData.js")
-path.write_text(js, encoding="utf-8")
-print(f"Created {path} with {len(stories)} stories")
