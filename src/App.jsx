@@ -651,6 +651,7 @@ export default function App() {
   const [copiedId, setCopiedId] = useState(null);
   const [mobileView, setMobileView] = useState("list");
   const [storyBoardIds, setStoryBoardIds] = useState([]);
+  const [showBoardFilters, setShowBoardFilters] = useState(false);
 
   const industries = useMemo(() => ["All", ...Array.from(new Set(STORIES_DATA.map((s) => s.industry).filter(Boolean))).sort()], []);
   const families = useMemo(() => {
@@ -669,7 +670,6 @@ export default function App() {
     return STORIES_DATA.filter((story) => {
       const text = storyText(story);
       const query = searchText.trim().toLowerCase();
-
       const matchesSearch = !query || text.includes(query) || (story.triggerPhrases || []).some((phrase) => phrase.toLowerCase().includes(query));
       const matchesIndustry = selectedIndustry === "All" || story.industry === selectedIndustry;
       const matchesPain = storyHasPain(story, selectedPain);
@@ -677,7 +677,6 @@ export default function App() {
       const matchesFamily = selectedFamily === "All" || story.storyFamily === selectedFamily;
       const matchesTier = selectedTier === "All" || story.tier === selectedTier;
       const matchesModule = selectedModule === "All" || story.modules.includes(selectedModule);
-
       return matchesSearch && matchesIndustry && matchesPain && matchesPersonaFilter && matchesFamily && matchesTier && matchesModule;
     })
       .map((story) => ({ ...story, matchScore: getStoryScore(story, filters), matchReasons: getMatchReasons(story, filters) }))
@@ -688,13 +687,13 @@ export default function App() {
   const relatedStories = useMemo(() => findRelatedStories(selectedStory, STORIES_DATA), [selectedStory]);
   const storyBoardStories = useMemo(() => storyBoardIds.map((id) => STORIES_DATA.find((story) => story.id === id)).filter(Boolean), [storyBoardIds]);
   const storyBoardCopy = useMemo(() => buildStoryBoardPayload(storyBoardStories, selectedPersona, voiceMode), [storyBoardStories, selectedPersona, voiceMode]);
+  const isStoryBoardMode = storyBoardStories.length > 0;
 
   useEffect(() => {
     if (!filteredStories.length) {
       setSelectedStory(null);
       return;
     }
-
     const stillExists = filteredStories.some((story) => story.id === selectedStory?.id);
     if (!stillExists) setSelectedStory(filteredStories[0]);
   }, [filteredStories, selectedStory?.id]);
@@ -706,9 +705,8 @@ export default function App() {
 
   async function handleCopy(text, id) {
     try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-      } else {
+      if (navigator?.clipboard?.writeText) await navigator.clipboard.writeText(text);
+      else {
         const textarea = document.createElement("textarea");
         textarea.value = text;
         document.body.appendChild(textarea);
@@ -716,7 +714,6 @@ export default function App() {
         document.execCommand("copy");
         document.body.removeChild(textarea);
       }
-
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 1800);
     } catch (error) {
@@ -759,364 +756,212 @@ export default function App() {
     setCopyMode("talkTrack");
     setVoiceMode("workjam");
     setMobileView("list");
+    setShowBoardFilters(false);
     setSelectedStory(STORIES_DATA[0]);
   }
 
-  const SelectedPersonaIcon = selectedPersona === "All" ? Users : PERSONAS.find((p) => p.id === selectedPersona)?.icon || Users;
+  const filterControls = (
+    <>
+      <FilterSection title="Client Pain"><Select value={selectedPain} onChange={setSelectedPain} options={["All", ...PAINS_LIST.map((p) => p.name)]} /></FilterSection>
+      <FilterSection title="Buyer Persona">
+        <div className="grid grid-cols-2 gap-1">
+          <PersonaButton active={selectedPersona === "All"} label="All" icon={Users} onClick={() => setSelectedPersona("All")} />
+          {PERSONAS.map((persona) => <PersonaButton key={persona.id} active={selectedPersona === persona.id} label={persona.name} icon={persona.icon} onClick={() => setSelectedPersona(persona.id)} />)}
+        </div>
+      </FilterSection>
+      <FilterSection title="Story Family"><Select value={selectedFamily} onChange={setSelectedFamily} options={families} /></FilterSection>
+      <FilterSection title="Module"><Select value={selectedModule} onChange={setSelectedModule} options={modules} /></FilterSection>
+      <FilterSection title="Tier"><Select value={selectedTier} onChange={setSelectedTier} options={tiers} /></FilterSection>
+    </>
+  );
+
+  const storyListColumn = (
+    <section className={`h-full min-h-0 min-w-0 overflow-hidden border-r flex flex-col ${darkMode ? "bg-[#18181B] border-neutral-800" : "bg-white border-neutral-200"}`}>
+      <div className="p-3 border-b border-neutral-200 dark:border-neutral-800 flex flex-col gap-2 shrink-0">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 text-neutral-400" size={13} />
+          <input type="text" placeholder="Search stories, pains, modules, phrases..." value={searchText} onChange={(event) => setSearchText(event.target.value)} className={`w-full pl-8 pr-7 py-1.5 rounded-lg text-xs transition-colors focus:outline-none ${darkMode ? "bg-neutral-800 text-white placeholder-neutral-500" : "bg-neutral-100 text-neutral-950 placeholder-neutral-500"}`} />
+          {searchText && <button onClick={() => setSearchText("")} className="absolute right-2 top-2 text-neutral-400 hover:text-neutral-600"><X size={12} /></button>}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <LabeledSelect label="Industry" value={selectedIndustry} onChange={setSelectedIndustry} options={industries} />
+          <LabeledSelect label="Family" value={selectedFamily} onChange={setSelectedFamily} options={families} />
+        </div>
+
+        {isStoryBoardMode && (
+          <div className="flex items-center justify-between pt-1">
+            <button onClick={() => setShowBoardFilters((value) => !value)} className="text-xs text-blue-500 font-semibold flex items-center gap-1">
+              {showBoardFilters ? "Hide filters" : "Show filters"}
+              <ChevronRight size={12} />
+            </button>
+            <span className="text-[10px] font-mono text-neutral-400">{filteredStories.length} matched</span>
+          </div>
+        )}
+
+        {!isStoryBoardMode && (
+          <div className="md:hidden flex items-center justify-between pt-1">
+            <button onClick={() => setMobileView("sidebar")} className="text-xs text-blue-500 font-semibold flex items-center gap-1">Filters <ChevronRight size={12} /></button>
+            <span className="text-[10px] font-mono text-neutral-400">{filteredStories.length} matched</span>
+          </div>
+        )}
+      </div>
+
+      {isStoryBoardMode && showBoardFilters && (
+        <div className="shrink-0 max-h-[42vh] overflow-y-auto p-3 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/40">
+          {filterControls}
+        </div>
+      )}
+
+      {topStories.length > 0 && activeFolder === "recommend" && !isStoryBoardMode && (
+        <div className="p-3 border-b border-neutral-200 dark:border-neutral-800 shrink-0">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5"><Star size={12} className="text-amber-500" /><span className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 font-mono">Best-fit</span></div>
+            <span className="text-[10px] text-neutral-400">{filteredStories.length} matches</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            {topStories.slice(0, 3).map((story, index) => (
+              <button key={story.id} onClick={() => openStory(story)} className="text-left rounded-lg p-2 bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 transition-colors">
+                <div className="flex items-center justify-between gap-2"><span className="text-[11px] font-bold text-neutral-800 dark:text-neutral-100 truncate">{index + 1}. {story.company}</span><span className="text-[10px] font-mono text-blue-500 shrink-0">Score {story.matchScore}</span></div>
+                <p className="text-[10px] text-neutral-500 mt-0.5 line-clamp-1">{story.name}</p>
+                <p className="text-[10px] text-neutral-400 mt-0.5 line-clamp-1">{story.matchReasons?.[0] || story.storyFamily}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain divide-y divide-neutral-100 dark:divide-neutral-800">
+        {filteredStories.length === 0 ? (
+          <div className="p-8 text-center text-neutral-400"><FileText size={28} className="mx-auto mb-2 opacity-40" /><p className="text-xs">No customer stories found. Try removing a filter.</p></div>
+        ) : filteredStories.map((story) => (
+          <div key={story.id} className="relative group">
+            <StoryRow story={story} selected={selectedStory?.id === story.id} darkMode={darkMode} onClick={() => openStory(story)} />
+            <button
+              onClick={() => addToStoryBoard(story)}
+              disabled={storyBoardIds.includes(story.id) || storyBoardIds.length >= 4}
+              className={`absolute right-3 bottom-3 px-2 py-1 rounded-md text-[10px] font-semibold border transition-colors ${
+                storyBoardIds.includes(story.id)
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30"
+                  : storyBoardIds.length >= 4
+                    ? "bg-neutral-100 text-neutral-400 border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800 cursor-not-allowed"
+                    : "bg-white dark:bg-neutral-950 text-blue-600 dark:text-blue-300 border-blue-200 dark:border-blue-500/30 hover:bg-blue-50 dark:hover:bg-blue-500/10"
+              }`}
+            >
+              {storyBoardIds.includes(story.id) ? "Added" : storyBoardIds.length >= 4 ? "Full" : "+ Board"}
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 
   return (
-    <div className={`min-h-screen w-full overflow-x-hidden font-sans antialiased transition-colors duration-200 ${darkMode ? "bg-[#121212] text-neutral-100" : "bg-[#F2F2F7] text-neutral-950"}`}>
+    <div className={`fixed inset-0 h-dvh w-dvw overflow-hidden font-sans antialiased transition-colors duration-200 ${darkMode ? "bg-[#121212] text-neutral-100" : "bg-[#F2F2F7] text-neutral-950"}`}>
       <header className={`h-16 px-5 flex items-center justify-between border-b shrink-0 ${darkMode ? "bg-[#1C1C1E] border-neutral-800" : "bg-white border-neutral-200"}`}>
         <div className="flex items-center gap-3 min-w-0">
           <Folder size={16} className="text-blue-500 shrink-0" />
           <div className="min-w-0">
-            <div className="text-xs font-semibold tracking-tight text-neutral-500 dark:text-neutral-300 font-mono truncate">
-              WORKJAM STORY SELECTOR
-            </div>
-            <div className="text-[10px] text-neutral-400 truncate">
-              Dynamic presales story matching · {STORIES_DATA.length} stories
-            </div>
+            <div className="text-xs font-semibold tracking-tight text-neutral-500 dark:text-neutral-300 font-mono truncate">WORKJAM STORY SELECTOR</div>
+            <div className="text-[10px] text-neutral-400 truncate">{isStoryBoardMode ? "Storyboard workspace" : `Dynamic presales story matching · ${STORIES_DATA.length} stories`}</div>
           </div>
         </div>
-
         <div className="flex items-center gap-2 shrink-0">
-          <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20">
-            Storyboard {storyBoardStories.length}/4
-          </span>
-          <button onClick={resetFilters} className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800">
-            <SlidersHorizontal size={13} />
-            Reset
-          </button>
-
-          <button onClick={() => setDarkMode(!darkMode)} className={`p-1.5 rounded-lg transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800 ${darkMode ? "text-amber-400" : "text-neutral-500"}`} title="Toggle theme">
-            {darkMode ? <Sun size={15} /> : <Moon size={15} />}
-          </button>
+          {isStoryBoardMode && <button onClick={clearStoryBoard} className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800">Exit Storyboard</button>}
+          <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20">Storyboard {storyBoardStories.length}/4</span>
+          <button onClick={resetFilters} className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"><SlidersHorizontal size={13} />Reset</button>
+          <button onClick={() => setDarkMode(!darkMode)} className={`p-1.5 rounded-lg transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800 ${darkMode ? "text-amber-400" : "text-neutral-500"}`} title="Toggle theme">{darkMode ? <Sun size={15} /> : <Moon size={15} />}</button>
         </div>
       </header>
 
-      <div className="w-full max-w-none grid grid-cols-1 md:grid-cols-[320px_minmax(420px,34vw)_1fr] items-start">
-        <aside className={`min-h-[calc(100vh-4rem)] md:sticky md:top-16 md:h-[calc(100vh-4rem)] md:overflow-y-auto border-r p-4 flex flex-col gap-5 ${darkMode ? "bg-[#1C1C1E] border-neutral-800" : "bg-[#F2F2F7] border-neutral-300"} ${mobileView !== "sidebar" ? "hidden md:flex" : "flex"}`}>
-          <div>
-            <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest px-2 mb-2">Story Modes</h3>
-            <div className="flex flex-col gap-1">
-              <SidebarButton active={activeFolder === "recommend"} icon={Sparkles} label="Best-fit Recommendations" count={topStories.length} onClick={() => { setActiveFolder("recommend"); setMobileView("list"); }} />
-              <SidebarButton active={activeFolder === "all"} icon={Inbox} label="All Stories" count={STORIES_DATA.length} onClick={() => { setActiveFolder("all"); setMobileView("list"); }} />
-              <SidebarButton active={activeFolder === "pain"} icon={Bookmark} label="Pain Matcher" count={PAINS_LIST.length} onClick={() => { setActiveFolder("pain"); setMobileView("list"); }} />
-            </div>
-          </div>
-
-          <FilterSection title="Client Pain">
-            <Select value={selectedPain} onChange={setSelectedPain} options={["All", ...PAINS_LIST.map((p) => p.name)]} />
-          </FilterSection>
-
-          <FilterSection title="Buyer Persona">
-            <div className="grid grid-cols-2 gap-1">
-              <PersonaButton active={selectedPersona === "All"} label="All" icon={Users} onClick={() => setSelectedPersona("All")} />
-              {PERSONAS.map((persona) => (
-                <PersonaButton key={persona.id} active={selectedPersona === persona.id} label={persona.name} icon={persona.icon} onClick={() => setSelectedPersona(persona.id)} />
-              ))}
-            </div>
-          </FilterSection>
-
-          <FilterSection title="Story Family"><Select value={selectedFamily} onChange={setSelectedFamily} options={families} /></FilterSection>
-          <FilterSection title="Module"><Select value={selectedModule} onChange={setSelectedModule} options={modules} /></FilterSection>
-          <FilterSection title="Tier"><Select value={selectedTier} onChange={setSelectedTier} options={tiers} /></FilterSection>
-
-          <div className="mt-auto pt-4 border-t border-neutral-200 dark:border-neutral-800 px-2 text-[10px] text-neutral-400 leading-snug font-mono">
-            Score = pain + persona + module + family + proof + confidence.
-          </div>
-        </aside>
-
-        <section className={`min-h-[calc(100vh-4rem)] border-r flex flex-col ${darkMode ? "bg-[#18181B] border-neutral-800" : "bg-white border-neutral-200"} ${mobileView === "sidebar" || (mobileView === "detail" && selectedStory) ? "hidden md:flex" : "flex"}`}>
-          <div className="p-3 border-b border-neutral-200 dark:border-neutral-800 flex flex-col gap-2 shrink-0">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 text-neutral-400" size={13} />
-              <input type="text" placeholder="Search by phrase, buyer pain, module, story..." value={searchText} onChange={(event) => setSearchText(event.target.value)} className={`w-full pl-8 pr-7 py-1.5 rounded-lg text-xs transition-colors focus:outline-none ${darkMode ? "bg-neutral-800 text-white placeholder-neutral-500" : "bg-neutral-100 text-neutral-950 placeholder-neutral-500"}`} />
-              {searchText && <button onClick={() => setSearchText("")} className="absolute right-2 top-2 text-neutral-400 hover:text-neutral-600"><X size={12} /></button>}
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <LabeledSelect label="Industry" value={selectedIndustry} onChange={setSelectedIndustry} options={industries} />
-              <LabeledSelect label="Family" value={selectedFamily} onChange={setSelectedFamily} options={families} />
-            </div>
-
-            <div className="md:hidden flex items-center justify-between pt-1">
-              <button onClick={() => setMobileView("sidebar")} className="text-xs text-blue-500 font-semibold flex items-center gap-1">Filters <ChevronRight size={12} /></button>
-              <span className="text-[10px] font-mono text-neutral-400">{filteredStories.length} matched</span>
-            </div>
-          </div>
-
-          {topStories.length > 0 && activeFolder === "recommend" && (
-            <div className="p-3 border-b border-neutral-200 dark:border-neutral-800 shrink-0">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-1.5">
-                  <Star size={12} className="text-amber-500" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 font-mono">Best-fit</span>
-                </div>
-                <span className="text-[10px] text-neutral-400">{filteredStories.length} matches</span>
-              </div>
-
+      {isStoryBoardMode ? (
+        <div className="h-[calc(100dvh-4rem)] min-h-0 w-full grid grid-cols-1 lg:grid-cols-[420px_minmax(0,1fr)] overflow-hidden">
+          {storyListColumn}
+          <main className="h-full min-h-0 min-w-0 overflow-hidden p-4 bg-white dark:bg-[#121212]">
+            <StoryBoardColumns
+              stories={storyBoardStories}
+              combinedCopy={storyBoardCopy}
+              copiedId={copiedId}
+              onCopy={handleCopy}
+              onOpenStory={openStory}
+              onRemoveStory={removeFromStoryBoard}
+              onClear={clearStoryBoard}
+            />
+          </main>
+        </div>
+      ) : (
+        <div className="h-[calc(100dvh-4rem)] min-h-0 w-full grid grid-cols-1 md:grid-cols-[320px_420px_minmax(0,1fr)] overflow-hidden">
+          <aside className={`h-full min-h-0 overflow-y-auto border-r p-4 flex flex-col gap-5 ${darkMode ? "bg-[#1C1C1E] border-neutral-800" : "bg-[#F2F2F7] border-neutral-300"} ${mobileView !== "sidebar" ? "hidden md:flex" : "flex"}`}>
+            <div>
+              <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest px-2 mb-2">Story Modes</h3>
               <div className="flex flex-col gap-1">
-                {topStories.slice(0, 3).map((story, index) => (
-                  <button key={story.id} onClick={() => openStory(story)} className="text-left rounded-lg p-2 bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 transition-colors">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-bold text-neutral-800 dark:text-neutral-100 truncate">{index + 1}. {story.company}</span>
-                      <span className="text-[10px] font-mono text-blue-500 shrink-0">Score {story.matchScore}</span>
-                    </div>
-                    <p className="text-[10px] text-neutral-500 mt-0.5 line-clamp-1">{story.name}</p>
-                    <p className="text-[10px] text-neutral-400 mt-0.5 line-clamp-1">{story.matchReasons?.[0] || story.storyFamily}</p>
-                  </button>
-                ))}
+                <SidebarButton active={activeFolder === "recommend"} icon={Sparkles} label="Best-fit Recommendations" count={topStories.length} onClick={() => { setActiveFolder("recommend"); setMobileView("list"); }} />
+                <SidebarButton active={activeFolder === "all"} icon={Inbox} label="All Stories" count={STORIES_DATA.length} onClick={() => { setActiveFolder("all"); setMobileView("list"); }} />
+                <SidebarButton active={activeFolder === "pain"} icon={Bookmark} label="Pain Matcher" count={PAINS_LIST.length} onClick={() => { setActiveFolder("pain"); setMobileView("list"); }} />
               </div>
             </div>
-          )}
+            {filterControls}
+            <div className="mt-auto pt-4 border-t border-neutral-200 dark:border-neutral-800 px-2 text-[10px] text-neutral-400 leading-snug font-mono">Score = pain + persona + module + family + proof + confidence.</div>
+          </aside>
+          <div className={`${mobileView === "sidebar" || (mobileView === "detail" && selectedStory) ? "hidden md:block" : "block"} h-full min-h-0 min-w-0 overflow-hidden`}>{storyListColumn}</div>
+          <main className={`h-full min-h-0 min-w-0 overflow-y-auto ${darkMode ? "bg-[#121212]" : "bg-white"} ${mobileView !== "detail" ? "hidden md:block" : "block"}`}>
+            <StoryDetailPane
+              selectedStory={selectedStory}
+              relatedStories={relatedStories}
+              storyBoardIds={storyBoardIds}
+              storyBoardStories={storyBoardStories}
+              storyBoardCopy={storyBoardCopy}
+              copiedId={copiedId}
+              copyMode={copyMode}
+              setCopyMode={setCopyMode}
+              voiceMode={voiceMode}
+              setVoiceMode={setVoiceMode}
+              generatedCopy={generatedCopy}
+              addToStoryBoard={addToStoryBoard}
+              removeFromStoryBoard={removeFromStoryBoard}
+              clearStoryBoard={clearStoryBoard}
+              openStory={openStory}
+              handleCopy={handleCopy}
+              setMobileView={setMobileView}
+            />
+          </main>
+        </div>
+      )}
+    </div>
+  );
+}
 
-          <div className="flex-1 divide-y divide-neutral-100 dark:divide-neutral-800">
-            {filteredStories.length === 0 ? (
-              <div className="p-8 text-center text-neutral-400">
-                <FileText size={28} className="mx-auto mb-2 opacity-40" />
-                <p className="text-xs">No customer stories found. Try removing a filter.</p>
-              </div>
-            ) : (
-              filteredStories.map((story) => (
-                <StoryRow key={story.id} story={story} selected={selectedStory?.id === story.id} darkMode={darkMode} onClick={() => openStory(story)} />
-              ))
-            )}
-          </div>
-        </section>
+function StoryDetailPane({ selectedStory, relatedStories, storyBoardIds, storyBoardStories, storyBoardCopy, copiedId, copyMode, setCopyMode, voiceMode, setVoiceMode, generatedCopy, addToStoryBoard, removeFromStoryBoard, clearStoryBoard, openStory, handleCopy, setMobileView }) {
+  if (!selectedStory) {
+    return <div className="p-12 text-center text-neutral-400 flex flex-col items-center justify-center h-full max-w-sm mx-auto"><FileText className="text-neutral-300 dark:text-neutral-700 mb-2" size={32} /><p className="text-xs">No story matches the current filters.</p></div>;
+  }
 
-        <main className={`min-h-[calc(100vh-4rem)] md:sticky md:top-16 md:h-[calc(100vh-4rem)] md:overflow-y-auto ${darkMode ? "bg-[#121212]" : "bg-white"} ${mobileView !== "detail" ? "hidden md:block" : "block"}`}>
-          <div className="min-h-full p-6 lg:p-8 2xl:p-10">
-            {selectedStory ? (
-              <div className="flex flex-col gap-6 text-left w-full">
-                <div className="md:hidden flex items-center justify-between border-b pb-3 border-neutral-200 dark:border-neutral-800 shrink-0">
-                  <button onClick={() => setMobileView("list")} className="text-xs text-blue-500 font-bold">← Back to List</button>
-                  <span className="text-[10px] font-mono text-neutral-400 font-bold">Story {selectedStory.num}</span>
-                </div>
+  const SelectedPersonaIcon = Users;
 
-                <div className="border-b border-neutral-100 dark:border-neutral-800 pb-4">
-                  <div className="flex items-center gap-2 mb-2 text-[10px] font-mono font-bold text-blue-500 tracking-wider">
-                    <span>{selectedStory.tier}</span><span>•</span><span>{selectedStory.storyFamily}</span>
-                  </div>
-                  <h2 className="text-2xl 2xl:text-3xl font-extrabold tracking-tight text-neutral-900 dark:text-white leading-tight">
-                    {selectedStory.company} — {selectedStory.name}
-                  </h2>
-                  <div className="flex flex-wrap gap-1.5 mt-3">
-                    <Badge label={`Score ${selectedStory.matchScore ?? getStoryScore(selectedStory, filters)}`} />
-                    <Badge label={`${selectedStory.confidenceScore}% confidence`} />
-                    <Badge label={selectedStory.proofLevel} tone={selectedStory.proofLevel} />
-                    <Badge label={selectedStory.proofTheme} />
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <button
-                      onClick={() => addToStoryBoard(selectedStory)}
-                      disabled={storyBoardIds.includes(selectedStory.id) || storyBoardIds.length >= 4}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-                        storyBoardIds.includes(selectedStory.id)
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30"
-                          : storyBoardIds.length >= 4
-                            ? "bg-neutral-100 text-neutral-400 border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800 cursor-not-allowed"
-                            : "bg-blue-500 text-white border-blue-500 hover:bg-blue-600"
-                      }`}
-                    >
-                      {storyBoardIds.includes(selectedStory.id) ? "Added to Storyboard" : storyBoardIds.length >= 4 ? "Storyboard Full" : "Add to Storyboard"}
-                    </button>
-                  </div>
-                </div>
+  return (
+    <div className="p-5 2xl:p-8">
+      <div className="flex flex-col gap-6 text-left w-full max-w-none">
+        <div className="md:hidden flex items-center justify-between border-b pb-3 border-neutral-200 dark:border-neutral-800 shrink-0"><button onClick={() => setMobileView("list")} className="text-xs text-blue-500 font-bold">← Back to List</button><span className="text-[10px] font-mono text-neutral-400 font-bold">Story {selectedStory.num}</span></div>
+        <div className="border-b border-neutral-100 dark:border-neutral-800 pb-4">
+          <div className="flex items-center gap-2 mb-2 text-[10px] font-mono font-bold text-blue-500 tracking-wider"><span>{selectedStory.tier}</span><span>•</span><span>{selectedStory.storyFamily}</span></div>
+          <h2 className="text-2xl 2xl:text-3xl font-extrabold tracking-tight text-neutral-900 dark:text-white leading-tight">{selectedStory.company} — {selectedStory.name}</h2>
+          <div className="flex flex-wrap gap-1.5 mt-3"><Badge label={`${selectedStory.confidenceScore}% confidence`} /><Badge label={selectedStory.proofLevel} tone={selectedStory.proofLevel} /><Badge label={selectedStory.proofTheme} /></div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => addToStoryBoard(selectedStory)} disabled={storyBoardIds.includes(selectedStory.id) || storyBoardIds.length >= 4} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${storyBoardIds.includes(selectedStory.id) ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30" : storyBoardIds.length >= 4 ? "bg-neutral-100 text-neutral-400 border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800 cursor-not-allowed" : "bg-blue-500 hover:bg-blue-600 text-white border-blue-500"}`}>{storyBoardIds.includes(selectedStory.id) ? "Added to Storyboard" : storyBoardIds.length >= 4 ? "Storyboard Full" : "Add to Storyboard"}</button>
+          {storyBoardStories.length > 0 && <button onClick={() => handleCopy(storyBoardCopy, "storyboard-copy")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${copiedId === "storyboard-copy" ? "bg-emerald-500 text-white" : "bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-neutral-800 dark:hover:bg-neutral-700"}`}>{copiedId === "storyboard-copy" ? <Check size={12} /> : <Copy size={12} />}{copiedId === "storyboard-copy" ? "Copied Storyboard" : "Copy Storyboard"}</button>}
+        </div>
 
-                {storyBoardStories.length > 0 && (
-                  <DetailCard title={`Storyboard (${storyBoardStories.length}/4)`} icon={Layers}>
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
-                        {storyBoardStories.map((story, index) => (
-                          <div key={story.id} className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 p-2">
-                            <div className="flex items-start justify-between gap-2">
-                              <button onClick={() => openStory(story)} className="text-left min-w-0">
-                                <p className="text-[10px] font-mono text-blue-500 font-bold">{index + 1}. {story.company}</p>
-                                <p className="text-xs font-bold text-neutral-800 dark:text-neutral-100 line-clamp-1">{story.name}</p>
-                              </button>
-                              <button onClick={() => removeFromStoryBoard(story.id)} className="text-neutral-400 hover:text-red-500 shrink-0" title="Remove">
-                                <X size={13} />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => handleCopy(storyBoardCopy, "storyboard-copy")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${copiedId === "storyboard-copy" ? "bg-emerald-500 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}>
-                          {copiedId === "storyboard-copy" ? <Check size={12} /> : <Copy size={12} />}
-                          {copiedId === "storyboard-copy" ? "Copied Storyboard" : "Copy Combined Storyboard"}
-                        </button>
-                        <button onClick={clearStoryBoard} className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:bg-neutral-50 dark:hover:bg-neutral-900">
-                          Clear
-                        </button>
-                      </div>
-                      <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white/70 dark:bg-neutral-950/50 p-3 max-h-56 overflow-y-auto font-mono text-[11px] leading-relaxed text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">
-                        {storyBoardCopy}
-                      </div>
-                    </div>
-                  </DetailCard>
-                )}
+        <DetailCard title="Why This Matched" icon={Sparkles}>{selectedStory.matchReasons?.length ? <ul className="space-y-1.5">{selectedStory.matchReasons.map((reason, index) => <li key={index} className="flex gap-2"><span className="text-emerald-500">✓</span><span>{reason}</span></li>)}</ul> : <p>This story is currently selected from the full story set.</p>}</DetailCard>
 
-                {storyBoardStories.length > 1 && (
-                  <StoryBoardColumns
-                    stories={storyBoardStories}
-                    combinedCopy={storyBoardCopy}
-                    copiedId={copiedId}
-                    onCopy={handleCopy}
-                    onOpenStory={openStory}
-                    onRemoveStory={removeFromStoryBoard}
-                    onClear={clearStoryBoard}
-                  />
-                )}
-
-                <DetailCard title="Why This Matched" icon={Sparkles}>
-                  {selectedStory.matchReasons?.length ? (
-                    <ul className="space-y-1.5">
-                      {selectedStory.matchReasons.map((reason, index) => <li key={index} className="flex gap-2"><span className="text-emerald-500">✓</span><span>{reason}</span></li>)}
-                    </ul>
-                  ) : <p>This story is currently selected from the full story set.</p>}
-                </DetailCard>
-
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                  <DetailCard title="Target Audiences" icon={SelectedPersonaIcon}>
-                    <p><strong>Primary:</strong> {selectedStory.primaryBuyers?.join("; ")}</p>
-                    {selectedStory.secondaryBuyers?.length > 0 && <p className="text-neutral-500 dark:text-neutral-400 mt-1"><strong>Secondary:</strong> {selectedStory.secondaryBuyers.join("; ")}</p>}
-                  </DetailCard>
-                  <DetailCard title="Profile" icon={Layers}><p>{selectedStory.profile}</p></DetailCard>
-                </div>
-
-                <div>
-                  <SectionTitle>What Actually Happened</SectionTitle>
-                  <p className="text-sm 2xl:text-base text-neutral-700 dark:text-neutral-300 leading-relaxed">{selectedStory.narrative}</p>
-                </div>
-
-                <div className={`p-4 rounded-xl border ${darkMode ? "bg-emerald-500/10 border-emerald-500/30" : "bg-emerald-50 border-emerald-200"}`}>
-                  <h4 className="text-[10px] text-emerald-600 dark:text-emerald-300 font-extrabold uppercase tracking-widest font-mono mb-2.5 flex items-center gap-1.5">
-                    <TrendingUp size={12} /><span>Key Outcomes / Proof</span>
-                  </h4>
-                  <ul className="grid grid-cols-1 xl:grid-cols-2 gap-2">
-                    {selectedStory.outcomes?.map((outcome, index) => (
-                      <li key={index} className="text-xs 2xl:text-sm text-neutral-800 dark:text-neutral-200 flex items-start gap-2">
-                        <span className="text-emerald-500 font-bold mt-0.5">•</span><span className="font-medium">{outcome}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className={`p-4 rounded-xl border ${darkMode ? "bg-blue-500/10 border-blue-500/30" : "bg-blue-50 border-blue-100"}`}>
-                  <h4 className="text-[10px] text-blue-500 font-extrabold uppercase tracking-widest font-mono mb-2 flex items-center gap-1">
-                    <Target size={12} /><span>Best Demo Angle</span>
-                  </h4>
-                  <p className="text-xs 2xl:text-sm text-neutral-800 dark:text-neutral-200 font-semibold">{selectedStory.demoAngle}</p>
-                </div>
-
-                <div className="border-t border-neutral-100 dark:border-neutral-800 pt-4">
-                  <SectionTitle>Why It Matters</SectionTitle>
-                  <p className="text-xs 2xl:text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed">{selectedStory.whyItMatters}</p>
-                </div>
-
-                <DetailCard title="WorkJam Voice Guidance" icon={Wand2}>
-                  <div className="space-y-2">
-                    <p><strong>Voice:</strong> plain-spoken, strategic, practical, and credible.</p>
-                    <p><strong>Frame:</strong> business problem first, product mechanics second, measurable value third.</p>
-                    <p><strong>Primary value lever:</strong> {inferPrimaryValueLever(selectedStory)}</p>
-                    <p className="text-neutral-500 dark:text-neutral-400">
-                      Avoid generic SaaS language. Position WorkJam as the frontline execution layer that connects communication, tasks, learning, scheduling, analytics, and integrations.
-                    </p>
-                  </div>
-                </DetailCard>
-
-                <DetailCard title="Modules & Trigger Phrases" icon={MessageSquare}>
-                  <div className="mb-3">
-                    <p className="text-[10px] uppercase tracking-widest font-mono text-neutral-400 mb-1">Modules</p>
-                    <PillList items={selectedStory.modules} />
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest font-mono text-neutral-400 mb-1">Trigger phrases</p>
-                    <PillList items={(selectedStory.triggerPhrases || []).slice(0, 10)} />
-                  </div>
-                </DetailCard>
-
-                {relatedStories.length > 0 && (
-                  <DetailCard title="Related Stories" icon={GitBranch}>
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
-                      {relatedStories.map((story) => (
-                        <div key={story.id} className="text-left p-2 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">
-                          <button onClick={() => openStory(story)} className="w-full text-left">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-xs font-bold text-neutral-800 dark:text-neutral-100 truncate">{story.company}</p>
-                              <Link2 size={12} className="text-neutral-400 shrink-0" />
-                            </div>
-                            <p className="text-[11px] text-neutral-500 line-clamp-1">{story.name}</p>
-                          </button>
-                          <button
-                            onClick={() => addToStoryBoard(story)}
-                            disabled={storyBoardIds.includes(story.id) || storyBoardIds.length >= 4}
-                            className={`mt-2 w-full py-1 rounded-md text-[10px] font-semibold border transition-colors ${
-                              storyBoardIds.includes(story.id)
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30"
-                                : storyBoardIds.length >= 4
-                                  ? "bg-neutral-100 text-neutral-400 border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800 cursor-not-allowed"
-                                  : "bg-white dark:bg-neutral-950 text-blue-600 dark:text-blue-300 border-blue-200 dark:border-blue-500/30 hover:bg-blue-50 dark:hover:bg-blue-500/10"
-                            }`}
-                          >
-                            {storyBoardIds.includes(story.id) ? "Added" : storyBoardIds.length >= 4 ? "Full" : "Add to Storyboard"}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </DetailCard>
-                )}
-
-                <div className={`p-4 rounded-xl border ${darkMode ? "bg-neutral-900 border-neutral-800" : "bg-neutral-50 border-neutral-200 shadow-sm"}`}>
-                  <div className="flex flex-col gap-3 border-b pb-3 mb-3 border-neutral-200 dark:border-neutral-800">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest font-mono flex items-center gap-1.5"><Wand2 size={12} />Copy Builder</span>
-                      <div className="flex gap-1 flex-wrap justify-end">
-                        <ModeButton mode="talkTrack" label="Talk" active={copyMode} setActive={setCopyMode} />
-                        <ModeButton mode="discovery" label="Questions" active={copyMode} setActive={setCopyMode} />
-                        <ModeButton mode="proof" label="Proof" active={copyMode} setActive={setCopyMode} />
-                        <ModeButton mode="demo" label="Demo" active={copyMode} setActive={setCopyMode} />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2 items-center">
-                      <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest font-mono">Voice Mode</label>
-                      <select
-                        value={voiceMode}
-                        onChange={(event) => setVoiceMode(event.target.value)}
-                        className="w-full py-1.5 px-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs font-semibold focus:outline-none text-neutral-700 dark:text-neutral-300"
-                      >
-                        {VOICE_MODES.map((voice) => (
-                          <option key={voice.id} value={voice.id}>
-                            {voice.label} — {voice.description}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white/60 dark:bg-neutral-950/40 p-2 text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
-                      {WORKJAM_VOICE_RULES[voiceMode]?.frame}
-                    </div>
-                  </div>
-                  <div className="p-3 bg-white dark:bg-[#121212] border border-neutral-200 dark:border-neutral-800 rounded-lg max-h-[300px] overflow-y-auto font-mono text-[11px] leading-relaxed text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">
-                    {generatedCopy}
-                  </div>
-                  <button onClick={() => handleCopy(generatedCopy, "copy-builder")} className={`w-full py-1.5 rounded-lg text-xs font-semibold mt-3 flex items-center justify-center gap-1.5 transition-all ${copiedId === "copy-builder" ? "bg-emerald-500 text-white" : "bg-blue-500 hover:bg-blue-600 text-white shadow-sm"}`}>
-                    {copiedId === "copy-builder" ? <Check size={12} /> : <Copy size={12} />}
-                    <span>{copiedId === "copy-builder" ? "Copied!" : "Copy Active Draft"}</span>
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="p-12 text-center text-neutral-400 flex flex-col items-center justify-center h-full max-w-sm mx-auto">
-                <FileText className="text-neutral-300 dark:text-neutral-700 mb-2" size={32} />
-                <p className="text-xs">No story matches the current filters.</p>
-              </div>
-            )}
-          </div>
-        </main>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4"><DetailCard title="Target Audiences" icon={SelectedPersonaIcon}><p><strong>Primary:</strong> {selectedStory.primaryBuyers?.join("; ")}</p>{selectedStory.secondaryBuyers?.length > 0 && <p className="text-neutral-500 dark:text-neutral-400 mt-1"><strong>Secondary:</strong> {selectedStory.secondaryBuyers.join("; ")}</p>}</DetailCard><DetailCard title="Profile" icon={Layers}><p>{selectedStory.profile}</p></DetailCard></div>
+        <div><SectionTitle>What Actually Happened</SectionTitle><p className="text-sm 2xl:text-base text-neutral-700 dark:text-neutral-300 leading-relaxed">{selectedStory.narrative}</p></div>
+        <div className="p-4 rounded-xl border bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/30"><h4 className="text-[10px] text-emerald-600 dark:text-emerald-300 font-extrabold uppercase tracking-widest font-mono mb-2.5 flex items-center gap-1.5"><TrendingUp size={12} /><span>Key Outcomes / Proof</span></h4><ul className="grid grid-cols-1 xl:grid-cols-2 gap-2">{selectedStory.outcomes?.map((outcome, index) => <li key={index} className="text-xs 2xl:text-sm text-neutral-800 dark:text-neutral-200 flex items-start gap-2"><span className="text-emerald-500 font-bold mt-0.5">•</span><span className="font-medium">{outcome}</span></li>)}</ul></div>
+        <div className="p-4 rounded-xl border bg-blue-50 border-blue-100 dark:bg-blue-500/10 dark:border-blue-500/30"><h4 className="text-[10px] text-blue-500 font-extrabold uppercase tracking-widest font-mono mb-2 flex items-center gap-1"><Target size={12} /><span>Best Demo Angle</span></h4><p className="text-xs 2xl:text-sm text-neutral-800 dark:text-neutral-200 font-semibold">{selectedStory.demoAngle}</p></div>
+        <div className="border-t border-neutral-100 dark:border-neutral-800 pt-4"><SectionTitle>Why It Matters</SectionTitle><p className="text-xs 2xl:text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed">{selectedStory.whyItMatters}</p></div>
+        <DetailCard title="WorkJam Voice Guidance" icon={Wand2}><div className="space-y-2"><p><strong>Voice:</strong> plain-spoken, strategic, practical, and credible.</p><p><strong>Frame:</strong> business problem first, product mechanics second, measurable value third.</p><p><strong>Primary value lever:</strong> {inferPrimaryValueLever(selectedStory)}</p><p className="text-neutral-500 dark:text-neutral-400">Avoid generic SaaS language. Position WorkJam as the frontline execution layer that connects communication, tasks, learning, scheduling, analytics, and integrations.</p></div></DetailCard>
+        {relatedStories.length > 0 && <DetailCard title="Related Stories" icon={GitBranch}><div className="grid grid-cols-1 xl:grid-cols-2 gap-2">{relatedStories.map((story) => <div key={story.id} className="text-left p-2 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors"><button onClick={() => openStory(story)} className="w-full text-left"><div className="flex items-center justify-between gap-2"><p className="text-xs font-bold text-neutral-800 dark:text-neutral-100 truncate">{story.company}</p><Link2 size={12} className="text-neutral-400 shrink-0" /></div><p className="text-[11px] text-neutral-500 line-clamp-1">{story.name}</p></button><button onClick={() => addToStoryBoard(story)} disabled={storyBoardIds.includes(story.id) || storyBoardIds.length >= 4} className={`mt-2 w-full py-1 rounded-md text-[10px] font-semibold border transition-colors ${storyBoardIds.includes(story.id) ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30" : storyBoardIds.length >= 4 ? "bg-neutral-100 text-neutral-400 border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800 cursor-not-allowed" : "bg-white dark:bg-neutral-950 text-blue-600 dark:text-blue-300 border-blue-200 dark:border-blue-500/30 hover:bg-blue-50 dark:hover:bg-blue-500/10"}`}>{storyBoardIds.includes(story.id) ? "Added" : storyBoardIds.length >= 4 ? "Full" : "Add to Storyboard"}</button></div>)}</div></DetailCard>}
+        <div className="p-4 rounded-xl border bg-neutral-50 border-neutral-200 shadow-sm dark:bg-neutral-900 dark:border-neutral-800"><div className="flex flex-col gap-3 border-b pb-3 mb-3 border-neutral-200 dark:border-neutral-800"><div className="flex items-center justify-between gap-3"><span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest font-mono flex items-center gap-1.5"><Wand2 size={12} />Copy Builder</span><div className="flex gap-1 flex-wrap justify-end"><ModeButton mode="talkTrack" label="Talk" active={copyMode} setActive={setCopyMode} /><ModeButton mode="discovery" label="Questions" active={copyMode} setActive={setCopyMode} /><ModeButton mode="proof" label="Proof" active={copyMode} setActive={setCopyMode} /><ModeButton mode="demo" label="Demo" active={copyMode} setActive={setCopyMode} /></div></div><div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2 items-center"><label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest font-mono">Voice Mode</label><select value={voiceMode} onChange={(event) => setVoiceMode(event.target.value)} className="w-full py-1.5 px-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs font-semibold focus:outline-none text-neutral-700 dark:text-neutral-300">{VOICE_MODES.map((voice) => <option key={voice.id} value={voice.id}>{voice.label} — {voice.description}</option>)}</select></div><div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white/60 dark:bg-neutral-950/40 p-2 text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">{WORKJAM_VOICE_RULES[voiceMode]?.frame}</div></div><div className="p-3 bg-white dark:bg-[#121212] border border-neutral-200 dark:border-neutral-800 rounded-lg max-h-[300px] overflow-y-auto font-mono text-[11px] leading-relaxed text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">{generatedCopy}</div><button onClick={() => handleCopy(generatedCopy, "copy-builder")} className={`w-full py-1.5 rounded-lg text-xs font-semibold mt-3 flex items-center justify-center gap-1.5 transition-all ${copiedId === "copy-builder" ? "bg-emerald-500 text-white" : "bg-blue-500 hover:bg-blue-600 text-white shadow-sm"}`}>{copiedId === "copy-builder" ? <Check size={12} /> : <Copy size={12} />}<span>{copiedId === "copy-builder" ? "Copied!" : "Copy Active Draft"}</span></button></div>
       </div>
     </div>
   );
@@ -1192,7 +1037,7 @@ function StoryBoardColumns({ stories, combinedCopy, copiedId, onCopy, onOpenStor
   ]).slice(0, 6);
 
   return (
-    <div className="rounded-2xl border border-blue-200 dark:border-blue-500/30 bg-blue-50/50 dark:bg-blue-500/10 p-4">
+    <div className="h-full min-h-0 min-w-0 rounded-2xl border border-blue-200 dark:border-blue-500/30 bg-blue-50/50 dark:bg-blue-500/10 p-4 flex flex-col overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
           <h3 className="text-sm font-extrabold text-neutral-900 dark:text-white tracking-tight">
@@ -1224,7 +1069,7 @@ function StoryBoardColumns({ stories, combinedCopy, copiedId, onCopy, onOpenStor
       </div>
 
       <div
-        className="grid gap-3 overflow-x-auto pb-2"
+        className="flex-1 min-h-0 min-w-0 grid gap-3 overflow-x-auto overflow-y-hidden pb-2"
         style={{
           gridTemplateColumns: `repeat(${stories.length}, minmax(260px, 1fr)) minmax(320px, 1.15fr)`
         }}
@@ -1232,7 +1077,7 @@ function StoryBoardColumns({ stories, combinedCopy, copiedId, onCopy, onOpenStor
         {stories.map((story, index) => (
           <div
             key={story.id}
-            className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 p-3 min-w-[260px] flex flex-col gap-3"
+            className="h-full min-h-0 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 p-3 min-w-[280px] flex flex-col gap-3 overflow-y-auto"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
@@ -1291,7 +1136,7 @@ function StoryBoardColumns({ stories, combinedCopy, copiedId, onCopy, onOpenStor
           </div>
         ))}
 
-        <div className="rounded-xl border border-blue-200 dark:border-blue-500/30 bg-white dark:bg-neutral-950 p-3 min-w-[320px] flex flex-col gap-3">
+        <div className="h-full min-h-0 rounded-xl border border-blue-200 dark:border-blue-500/30 bg-white dark:bg-neutral-950 p-3 min-w-[360px] flex flex-col gap-3 overflow-y-auto">
           <div>
             <p className="text-[10px] font-mono text-blue-500 font-bold uppercase tracking-wider">
               Combined Story
@@ -1402,4 +1247,3 @@ function ModeButton({ mode, label, active, setActive }) {
     </button>
   );
 }
-
