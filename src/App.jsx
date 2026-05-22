@@ -536,7 +536,7 @@ export default function App() {
   const SelectedPersonaIcon = selectedPersona === "All" ? Users : PERSONAS.find((p) => p.id === selectedPersona)?.icon || Users;
 
   return (
-    <div className={`h-screen w-screen overflow-hidden font-sans antialiased transition-colors duration-200 ${darkMode ? "bg-[#121212] text-neutral-100" : "bg-[#F2F2F7] text-neutral-950"}`}>
+    <div className={`min-h-screen w-full overflow-x-hidden font-sans antialiased transition-colors duration-200 ${darkMode ? "bg-[#121212] text-neutral-100" : "bg-[#F2F2F7] text-neutral-950"}`}>
       <header className={`h-16 px-5 flex items-center justify-between border-b shrink-0 ${darkMode ? "bg-[#1C1C1E] border-neutral-800" : "bg-white border-neutral-200"}`}>
         <div className="flex items-center gap-3 min-w-0">
           <Folder size={16} className="text-blue-500 shrink-0" />
@@ -562,8 +562,8 @@ export default function App() {
         </div>
       </header>
 
-      <div className="h-[calc(100vh-4rem)] w-screen max-w-none grid grid-cols-1 md:grid-cols-[320px_minmax(380px,32vw)_1fr] overflow-hidden">
-        <aside className={`h-full min-h-0 border-r p-4 flex flex-col gap-5 overflow-y-auto ${darkMode ? "bg-[#1C1C1E] border-neutral-800" : "bg-[#F2F2F7] border-neutral-300"} ${mobileView !== "sidebar" ? "hidden md:flex" : "flex"}`}>
+      <div className="w-full max-w-none grid grid-cols-1 md:grid-cols-[320px_minmax(420px,34vw)_1fr] items-start">
+        <aside className={`min-h-[calc(100vh-4rem)] md:sticky md:top-16 md:h-[calc(100vh-4rem)] md:overflow-y-auto border-r p-4 flex flex-col gap-5 ${darkMode ? "bg-[#1C1C1E] border-neutral-800" : "bg-[#F2F2F7] border-neutral-300"} ${mobileView !== "sidebar" ? "hidden md:flex" : "flex"}`}>
           <div>
             <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest px-2 mb-2">Story Modes</h3>
             <div className="flex flex-col gap-1">
@@ -595,7 +595,7 @@ export default function App() {
           </div>
         </aside>
 
-        <section className={`h-full min-h-0 border-r flex flex-col overflow-hidden ${darkMode ? "bg-[#18181B] border-neutral-800" : "bg-white border-neutral-200"} ${mobileView === "sidebar" || (mobileView === "detail" && selectedStory) ? "hidden md:flex" : "flex"}`}>
+        <section className={`min-h-[calc(100vh-4rem)] border-r flex flex-col ${darkMode ? "bg-[#18181B] border-neutral-800" : "bg-white border-neutral-200"} ${mobileView === "sidebar" || (mobileView === "detail" && selectedStory) ? "hidden md:flex" : "flex"}`}>
           <div className="p-3 border-b border-neutral-200 dark:border-neutral-800 flex flex-col gap-2 shrink-0">
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 text-neutral-400" size={13} />
@@ -639,7 +639,7 @@ export default function App() {
             </div>
           )}
 
-          <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-neutral-100 dark:divide-neutral-800">
+          <div className="flex-1 divide-y divide-neutral-100 dark:divide-neutral-800">
             {filteredStories.length === 0 ? (
               <div className="p-8 text-center text-neutral-400">
                 <FileText size={28} className="mx-auto mb-2 opacity-40" />
@@ -653,7 +653,7 @@ export default function App() {
           </div>
         </section>
 
-        <main className={`h-full min-h-0 overflow-y-auto ${darkMode ? "bg-[#121212]" : "bg-white"} ${mobileView !== "detail" ? "hidden md:block" : "block"}`}>
+        <main className={`min-h-[calc(100vh-4rem)] md:sticky md:top-16 md:h-[calc(100vh-4rem)] md:overflow-y-auto ${darkMode ? "bg-[#121212]" : "bg-white"} ${mobileView !== "detail" ? "hidden md:block" : "block"}`}>
           <div className="min-h-full p-6 lg:p-8 2xl:p-10">
             {selectedStory ? (
               <div className="flex flex-col gap-6 text-left w-full">
@@ -840,7 +840,7 @@ function StoryRow({ story, selected, darkMode, onClick }) {
         <span className="text-[9px] px-1.5 py-0.5 rounded border border-neutral-200 dark:border-neutral-700 text-neutral-500">{story.tier}</span>
       </div>
       <p className="text-[11px] mt-1.5 italic truncate text-neutral-500 dark:text-neutral-400">→ {story.outcomes?.[0] || story.demoAngle}</p>
-    </button>
+    </div>
   );
 }
 
