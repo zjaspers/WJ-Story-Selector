@@ -508,6 +508,35 @@ function findRelatedStories(selectedStory, allStories) {
     .slice(0, 4);
 }
 
+function buildStoryBoardPayload(stories, personaId, voiceMode = "workjam") {
+  if (!stories.length) return "No stories selected.";
+
+  const persona = PERSONAS.find((p) => p.id === personaId);
+  const voiceRule = WORKJAM_VOICE_RULES[voiceMode] || WORKJAM_VOICE_RULES.workjam;
+  const families = Array.from(new Set(stories.map((s) => s.storyFamily).filter(Boolean)));
+  const valueLevers = Array.from(new Set(stories.map((s) => inferPrimaryValueLever(s)).filter(Boolean)));
+  const modules = Array.from(new Set(stories.flatMap((s) => s.modules || s.capabilities || []))).slice(0, 10);
+  const pains = Array.from(new Set(stories.flatMap((s) => s.primaryPains || []))).slice(0, 8);
+
+  const storySummaries = stories
+    .map((story, index) => {
+      const proof = (story.outcomes || []).slice(0, 3).map((o) => `   - ${o}`).join("\n");
+      return `${index + 1}. ${story.company} — ${story.name}\n   Why it fits: ${story.demoAngle}\n   Proof:\n${proof}`;
+    })
+    .join("\n\n");
+
+  const discoveryQuestions = [
+    "Where does the current process break down between corporate intent, managers, and frontline execution?",
+    "How do you know the right people saw the message, understood the expectation, and completed the work?",
+    "Which part of this problem creates the most cost today: manager time, labor coverage, compliance risk, training friction, or slow execution?",
+    "What would leadership need to see to trust that this improved?",
+    "If you could connect communication, tasks, learning, scheduling, and proof in one operating rhythm, where would you start?"
+  ];
+
+  return `${voiceRule.name} storyboard\n\nVoice rule:\n${voiceRule.frame}\n\nBuyer focus:\n${persona?.fullName || "General buyer"}\n\nStoryboard theme:\n${families.join(" + ") || "Frontline execution"}\n\nPrimary value levers:\n${valueLevers.map((v) => `- ${v}`).join("\n")}\n\nShared buyer pains:\n${pains.map((p) => `- ${p}`).join("\n")}\n\nModules in the combined story:\n${modules.map((m) => `- ${m}`).join("\n")}\n\nCombined narrative:\nThese stories work together because they show the same pattern from different angles: frontline work breaks down when communication, workflow, learning, scheduling, and proof live in separate places. WorkJam creates the operating layer that connects the right audience, the right action, and the right evidence of execution.\n\nStories to use:\n${storySummaries}\n\nCombined discovery questions:\n${discoveryQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n")}\n\nSuggested demo flow:\n1. Start with the operating problem, not the product.\n2. Show how the current process creates friction or blind spots.\n3. Use Story 1 as the anchor proof.\n4. Use Story 2 as the second angle or objection handler.\n5. Use Story 3 as the expansion or executive proof point.\n6. Close with WorkJam as the frontline execution layer that turns insight into action.\n\nStrategic takeaway:\nOne app is useful. One operating rhythm is the real value.`;
+}
+
+
 function buildCopyPayload(story, mode, personaId, voiceMode = "workjam") {
   const persona = PERSONAS.find((p) => p.id === personaId);
   const voiceRule = WORKJAM_VOICE_RULES[voiceMode] || WORKJAM_VOICE_RULES.workjam;
@@ -621,6 +650,7 @@ export default function App() {
   const [voiceMode, setVoiceMode] = useState("workjam");
   const [copiedId, setCopiedId] = useState(null);
   const [mobileView, setMobileView] = useState("list");
+  const [storyBoardIds, setStoryBoardIds] = useState([]);
 
   const industries = useMemo(() => ["All", ...Array.from(new Set(STORIES_DATA.map((s) => s.industry).filter(Boolean))).sort()], []);
   const families = useMemo(() => {
@@ -656,6 +686,8 @@ export default function App() {
 
   const topStories = useMemo(() => filteredStories.slice(0, 5), [filteredStories]);
   const relatedStories = useMemo(() => findRelatedStories(selectedStory, STORIES_DATA), [selectedStory]);
+  const storyBoardStories = useMemo(() => storyBoardIds.map((id) => STORIES_DATA.find((story) => story.id === id)).filter(Boolean), [storyBoardIds]);
+  const storyBoardCopy = useMemo(() => buildStoryBoardPayload(storyBoardStories, selectedPersona, voiceMode), [storyBoardStories, selectedPersona, voiceMode]);
 
   useEffect(() => {
     if (!filteredStories.length) {
@@ -692,6 +724,28 @@ export default function App() {
     }
   }
 
+  function addToStoryBoard(story) {
+    if (!story) return;
+    setStoryBoardIds((current) => {
+      if (current.includes(story.id)) return current;
+      if (current.length >= 4) return current;
+      return [...current, story.id];
+    });
+  }
+
+  function removeFromStoryBoard(storyId) {
+    setStoryBoardIds((current) => current.filter((id) => id !== storyId));
+  }
+
+  function clearStoryBoard() {
+    setStoryBoardIds([]);
+  }
+
+  function openStory(story) {
+    setSelectedStory(story);
+    setMobileView("detail");
+  }
+
   function resetFilters() {
     setSearchText("");
     setSelectedIndustry("All");
@@ -720,6 +774,9 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20">
+            Storyboard {storyBoardStories.length}/4
+          </span>
           <button onClick={resetFilters} className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800">
             <SlidersHorizontal size={13} />
             Reset
@@ -795,7 +852,7 @@ export default function App() {
 
               <div className="flex flex-col gap-1">
                 {topStories.slice(0, 3).map((story, index) => (
-                  <button key={story.id} onClick={() => { setSelectedStory(story); setMobileView("detail"); }} className="text-left rounded-lg p-2 bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 transition-colors">
+                  <button key={story.id} onClick={() => openStory(story)} className="text-left rounded-lg p-2 bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 transition-colors">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[11px] font-bold text-neutral-800 dark:text-neutral-100 truncate">{index + 1}. {story.company}</span>
                       <span className="text-[10px] font-mono text-blue-500 shrink-0">Score {story.matchScore}</span>
@@ -816,7 +873,7 @@ export default function App() {
               </div>
             ) : (
               filteredStories.map((story) => (
-                <StoryRow key={story.id} story={story} selected={selectedStory?.id === story.id} darkMode={darkMode} onClick={() => { setSelectedStory(story); setMobileView("detail"); }} />
+                <StoryRow key={story.id} story={story} selected={selectedStory?.id === story.id} darkMode={darkMode} onClick={() => openStory(story)} />
               ))
             )}
           </div>
@@ -844,7 +901,56 @@ export default function App() {
                     <Badge label={selectedStory.proofLevel} tone={selectedStory.proofLevel} />
                     <Badge label={selectedStory.proofTheme} />
                   </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => addToStoryBoard(selectedStory)}
+                      disabled={storyBoardIds.includes(selectedStory.id) || storyBoardIds.length >= 4}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                        storyBoardIds.includes(selectedStory.id)
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30"
+                          : storyBoardIds.length >= 4
+                            ? "bg-neutral-100 text-neutral-400 border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800 cursor-not-allowed"
+                            : "bg-blue-500 text-white border-blue-500 hover:bg-blue-600"
+                      }`}
+                    >
+                      {storyBoardIds.includes(selectedStory.id) ? "Added to Storyboard" : storyBoardIds.length >= 4 ? "Storyboard Full" : "Add to Storyboard"}
+                    </button>
+                  </div>
                 </div>
+
+                {storyBoardStories.length > 0 && (
+                  <DetailCard title={`Storyboard (${storyBoardStories.length}/4)`} icon={Layers}>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
+                        {storyBoardStories.map((story, index) => (
+                          <div key={story.id} className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 p-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <button onClick={() => openStory(story)} className="text-left min-w-0">
+                                <p className="text-[10px] font-mono text-blue-500 font-bold">{index + 1}. {story.company}</p>
+                                <p className="text-xs font-bold text-neutral-800 dark:text-neutral-100 line-clamp-1">{story.name}</p>
+                              </button>
+                              <button onClick={() => removeFromStoryBoard(story.id)} className="text-neutral-400 hover:text-red-500 shrink-0" title="Remove">
+                                <X size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button onClick={() => handleCopy(storyBoardCopy, "storyboard-copy")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${copiedId === "storyboard-copy" ? "bg-emerald-500 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}>
+                          {copiedId === "storyboard-copy" ? <Check size={12} /> : <Copy size={12} />}
+                          {copiedId === "storyboard-copy" ? "Copied Storyboard" : "Copy Combined Storyboard"}
+                        </button>
+                        <button onClick={clearStoryBoard} className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:bg-neutral-50 dark:hover:bg-neutral-900">
+                          Clear
+                        </button>
+                      </div>
+                      <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white/70 dark:bg-neutral-950/50 p-3 max-h-56 overflow-y-auto font-mono text-[11px] leading-relaxed text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">
+                        {storyBoardCopy}
+                      </div>
+                    </div>
+                  </DetailCard>
+                )}
 
                 <DetailCard title="Why This Matched" icon={Sparkles}>
                   {selectedStory.matchReasons?.length ? (
@@ -918,13 +1024,28 @@ export default function App() {
                   <DetailCard title="Related Stories" icon={GitBranch}>
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
                       {relatedStories.map((story) => (
-                        <button key={story.id} onClick={() => setSelectedStory(story)} className="text-left p-2 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-xs font-bold text-neutral-800 dark:text-neutral-100 truncate">{story.company}</p>
-                            <Link2 size={12} className="text-neutral-400 shrink-0" />
-                          </div>
-                          <p className="text-[11px] text-neutral-500 line-clamp-1">{story.name}</p>
-                        </button>
+                        <div key={story.id} className="text-left p-2 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">
+                          <button onClick={() => openStory(story)} className="w-full text-left">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-xs font-bold text-neutral-800 dark:text-neutral-100 truncate">{story.company}</p>
+                              <Link2 size={12} className="text-neutral-400 shrink-0" />
+                            </div>
+                            <p className="text-[11px] text-neutral-500 line-clamp-1">{story.name}</p>
+                          </button>
+                          <button
+                            onClick={() => addToStoryBoard(story)}
+                            disabled={storyBoardIds.includes(story.id) || storyBoardIds.length >= 4}
+                            className={`mt-2 w-full py-1 rounded-md text-[10px] font-semibold border transition-colors ${
+                              storyBoardIds.includes(story.id)
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30"
+                                : storyBoardIds.length >= 4
+                                  ? "bg-neutral-100 text-neutral-400 border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800 cursor-not-allowed"
+                                  : "bg-white dark:bg-neutral-950 text-blue-600 dark:text-blue-300 border-blue-200 dark:border-blue-500/30 hover:bg-blue-50 dark:hover:bg-blue-500/10"
+                            }`}
+                          >
+                            {storyBoardIds.includes(story.id) ? "Added" : storyBoardIds.length >= 4 ? "Full" : "Add to Storyboard"}
+                          </button>
+                        </div>
                       ))}
                     </div>
                   </DetailCard>
@@ -1082,3 +1203,4 @@ function ModeButton({ mode, label, active, setActive }) {
     </button>
   );
 }
+
