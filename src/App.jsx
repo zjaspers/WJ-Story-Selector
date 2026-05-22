@@ -122,6 +122,144 @@ const DEMO_FIT_SCORE = {
   Light: 4
 };
 
+const VOICE_MODES = [
+  { id: "workjam", label: "WorkJam Voice", description: "Plain-spoken, executive, practical, credible" },
+  { id: "executive", label: "Executive Brief", description: "Short, strategic, outcome-first" },
+  { id: "discovery", label: "Discovery", description: "Question-led and buyer-centered" },
+  { id: "roi", label: "ROI / Value", description: "Value levers and conservative business case" },
+  { id: "competitive", label: "Competitive", description: "Contrast without trashing competitors" }
+];
+
+const WORKJAM_VOICE_RULES = {
+  workjam: {
+    name: "WorkJam Voice",
+    frame: "Use a plain-spoken, strategic, credible voice. Start with the business problem, explain why legacy approaches fall short, then position WorkJam as the operating layer that turns insight into action.",
+    avoid: "Avoid hype, canned SaaS language, overused AI phrasing, buzzwords, and positioning WorkJam as just a communications app, task tool, or scheduling add-on."
+  },
+  executive: {
+    name: "Executive Brief",
+    frame: "Write for a senior executive. Be concise, commercially aware, and outcome-first. Emphasize business risk, operational leverage, and measurable impact.",
+    avoid: "Avoid product walkthrough language, feature dumping, and overly tactical details."
+  },
+  discovery: {
+    name: "Discovery",
+    frame: "Write in a way that opens a conversation. Lead with the buyer's operating problem, then ask practical questions that expose the cost of the current process.",
+    avoid: "Avoid pitching too early. Do not sound like an SDR sequence."
+  },
+  roi: {
+    name: "ROI / Value",
+    frame: "Translate the story into value drivers: manager time saved, labor savings, turnover avoided, compliance lift, safety improvement, training cost avoided, adoption, or speed-to-execution.",
+    avoid: "Avoid heroic assumptions. Separate hard proof from modeled value."
+  },
+  competitive: {
+    name: "Competitive",
+    frame: "Acknowledge the common alternative, then show where point tools fall short. Position WorkJam as the frontline execution layer that connects communication, tasks, learning, scheduling, targeting, analytics, and integrations.",
+    avoid: "Avoid competitor bashing. Do not overclaim replacement of every system."
+  }
+};
+
+function inferPrimaryValueLever(story) {
+  const text = storyText(story);
+  if (/manager|hours|admin|approval|labor savings|time saved/.test(text)) return "Manager time saved";
+  if (/open shift|shift|scheduling|coverage|labor|agency/.test(text)) return "Labor flexibility";
+  if (/training|learning|lms|scorm|preboarding/.test(text)) return "Training efficiency";
+  if (/safety|incident|accident/.test(text)) return "Safety improvement";
+  if (/compliance|recall|red alert|audit|agreement/.test(text)) return "Compliance lift";
+  if (/adoption|daily|dau|hub|active users/.test(text)) return "Adoption and habit formation";
+  if (/engagement|sentiment|voice|communications|channels|comments/.test(text)) return "Engagement to execution";
+  if (/integration|erp|ukg|qualtrics|dailypay|systems|shadow it|tool sprawl/.test(text)) return "System orchestration";
+  if (/customer|cx|feedback|remediation/.test(text)) return "Customer experience lift";
+  return "Speed-to-execution";
+}
+
+function cleanWorkJamSentence(text) {
+  return String(text || "")
+    .replace(/digital transformation/gi, "frontline execution")
+    .replace(/leverage/gi, "use")
+    .replace(/utilize/gi, "use")
+    .replace(/synergy/gi, "coordination")
+    .replace(/seamless/gi, "simple")
+    .replace(/robust/gi, "strong");
+}
+
+function buildVoiceSummary(story, voiceMode = "workjam") {
+  const valueLever = inferPrimaryValueLever(story);
+  const outcome = story.outcomes?.[0] || "measurable frontline improvement";
+  const pain = story.primaryPains?.[0] || "frontline execution was harder than it needed to be";
+  const moduleList = (story.modules || story.capabilities || []).slice(0, 4).join(", ");
+
+  if (voiceMode === "executive") {
+    return cleanWorkJamSentence(`${story.company} faced a familiar frontline problem: ${pain.toLowerCase()}.
+
+The value of the story is not the feature set alone. It is the operating change: ${story.solution}
+
+The proof point is simple: ${outcome}.
+
+Strategic takeaway: this is a ${valueLever.toLowerCase()} story that shows how WorkJam turns frontline intent into measurable execution.`);
+  }
+
+  if (voiceMode === "discovery") {
+    return cleanWorkJamSentence(`This story is useful when the buyer is describing ${pain.toLowerCase()}.
+
+A strong way to open the conversation:
+"How are you handling this today, and where does it break down between corporate intent and site-level execution?"
+
+Follow-up:
+"What do managers have to do manually to make sure the work actually happens?"
+
+Story to use:
+${story.company} used WorkJam to ${story.solution.toLowerCase()}
+
+Proof:
+${outcome}`);
+  }
+
+  if (voiceMode === "roi") {
+    return cleanWorkJamSentence(`Value lens: ${valueLever}
+
+Customer example:
+${story.company} used WorkJam to address ${pain.toLowerCase()}.
+
+Operational mechanism:
+${story.solution}
+
+Proof:
+${(story.outcomes || []).slice(0, 4).map((o) => `- ${o}`).join("\n")}
+
+How to frame the business case:
+Start with the current volume of work, the time spent managing it, and the cost of delay. Then show how WorkJam improves execution, adoption, or manager capacity.`);
+  }
+
+  if (voiceMode === "competitive") {
+    return cleanWorkJamSentence(`Competitive angle:
+This story helps when the buyer is comparing WorkJam to a point solution.
+
+The issue is not whether a tool can send a message, assign a task, or show a schedule. The issue is whether the organization can connect the right audience, the right workflow, the right proof, and the right follow-through.
+
+${story.company} shows the broader WorkJam value:
+${story.solution}
+
+Modules involved:
+${moduleList}
+
+Proof:
+${outcome}`);
+  }
+
+  return cleanWorkJamSentence(`${story.company} had a practical frontline problem: ${pain.toLowerCase()}.
+
+WorkJam helped by creating a clearer operating layer for the frontline. The important part is not just that the work moved into an app. The important part is that communication, workflow, targeting, and proof came together in one place.
+
+What changed:
+${story.solution}
+
+Proof:
+${(story.outcomes || []).slice(0, 3).map((o) => `- ${o}`).join("\n")}
+
+Why it matters:
+${story.whyItMatters}`);
+}
+
 function storyText(story) {
   return [
     story.name,
@@ -370,72 +508,102 @@ function findRelatedStories(selectedStory, allStories) {
     .slice(0, 4);
 }
 
-function buildCopyPayload(story, mode, personaId) {
+function buildCopyPayload(story, mode, personaId, voiceMode = "workjam") {
   const persona = PERSONAS.find((p) => p.id === personaId);
+  const voiceRule = WORKJAM_VOICE_RULES[voiceMode] || WORKJAM_VOICE_RULES.workjam;
   const proof = (story.outcomes || []).slice(0, 4).map((outcome) => `- ${outcome}`).join("\n");
   const moduleList = (story.modules || story.capabilities || []).slice(0, 6).join(", ");
+  const valueLever = inferPrimaryValueLever(story);
+  const voiceSummary = buildVoiceSummary(story, voiceMode);
 
   if (mode === "talkTrack") {
-    return `${story.company} — ${story.name}
+    return `${voiceRule.name} talk track
 
-30-second talk track:
-${story.narrative}
+Voice rule:
+${voiceRule.frame}
+
+${voiceSummary}
+
+Close:
+This is why WorkJam should be positioned as the frontline execution layer, not just another app.`;
+  }
+
+  if (mode === "discovery") {
+    return `${voiceRule.name} discovery guide
+
+Voice rule:
+${voiceRule.frame}
+
+Buyer focus:
+${persona?.fullName || "General buyer"}
+
+Use this story when the buyer is dealing with:
+${story.primaryPains?.map((p) => `- ${p}`).join("\n") || "- Frontline execution friction"}
+
+Questions:
+1. How does this work today?
+2. Where does the current process slow down between HQ, managers, and frontline teams?
+3. What has to happen manually for the work to get done?
+4. What would leadership need to see to trust that execution improved?
+5. If this improved, would the value show up as time saved, risk reduced, adoption, retention, or faster execution?
+
+Relevant story:
+${story.company} — ${story.name}
+
+Proof:
+${proof}`;
+  }
+
+  if (mode === "proof") {
+    return `${voiceRule.name} proof summary
+
+Customer:
+${story.company}
+
+Business problem:
+${story.primaryPains?.[0] || story.storyFamily}
+
+Operational change:
+${story.solution}
+
+Primary value lever:
+${valueLever}
 
 Proof:
 ${proof}
 
-Best angle:
-${story.demoAngle}
+Strategic takeaway:
+${story.whyItMatters}
 
-Use this when:
-The buyer is focused on ${story.storyFamily.toLowerCase()} or says something like: "${story.triggerPhrases?.[0] || story.primaryPains?.[0] || "frontline execution"}."`;
-  }
-
-  if (mode === "discovery") {
-    return `Discovery questions for ${persona?.fullName || "the buyer"}:
-
-1. How are you currently handling ${story.primaryPains?.[0]?.toLowerCase() || "this frontline challenge"}?
-2. Where does that process break down across stores, locations, or teams?
-3. How do you know whether the issue is adoption, communication, labor, workflow design, or manager follow-up?
-4. What proof would leadership need to justify changing the current process?
-
-Relevant story:
-${story.company} — ${story.name}`;
-  }
-
-  if (mode === "proof") {
-    return `${story.company} proof points
-
-Proof level: ${story.proofLevel}
-Story family: ${story.storyFamily}
-Tier: ${story.tier}
-Confidence score: ${story.confidenceScore}
-
-Key outcomes:
-${proof}`;
+Note:
+Use customer names and metrics carefully. Validate externally before using in press, analyst, legal, or investor materials.`;
   }
 
   if (mode === "demo") {
-    return `Demo setup using ${story.company}
+    return `${voiceRule.name} demo setup
 
-1. Set up the pain:
+1. Start with the operating problem:
 ${story.primaryPains?.[0] || story.storyFamily}
 
-2. Show the WorkJam capability:
+2. Show why the legacy approach falls short:
+Messages, tasks, training, schedules, and data often live in separate places. That makes execution harder to see and harder to manage.
+
+3. Introduce WorkJam as the operating layer:
+WorkJam connects targeting, communication, workflow, learning, scheduling, analytics, and integrations so frontline intent becomes completed action.
+
+4. Show the relevant capabilities:
 ${moduleList}
 
-3. Show the business proof:
+5. Anchor in proof:
 ${story.outcomes?.[0] || "Measurable frontline improvement"}
 
-4. Close with:
-${story.whyItMatters}
-
-Demo angle:
+6. Close with the strategic lesson:
 ${story.demoAngle}`;
   }
 
-  return `${story.company} — ${story.name}`;
+  return voiceSummary;
 }
+
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(false);
@@ -450,6 +618,7 @@ export default function App() {
   const [selectedTier, setSelectedTier] = useState("All");
   const [selectedModule, setSelectedModule] = useState("All");
   const [copyMode, setCopyMode] = useState("talkTrack");
+  const [voiceMode, setVoiceMode] = useState("workjam");
   const [copiedId, setCopiedId] = useState(null);
   const [mobileView, setMobileView] = useState("list");
 
@@ -500,8 +669,8 @@ export default function App() {
 
   const generatedCopy = useMemo(() => {
     if (!selectedStory) return "No story selected.";
-    return buildCopyPayload(selectedStory, copyMode, selectedPersona);
-  }, [selectedStory, copyMode, selectedPersona]);
+    return buildCopyPayload(selectedStory, copyMode, selectedPersona, voiceMode);
+  }, [selectedStory, copyMode, selectedPersona, voiceMode]);
 
   async function handleCopy(text, id) {
     try {
@@ -723,6 +892,17 @@ export default function App() {
                   <p className="text-xs 2xl:text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed">{selectedStory.whyItMatters}</p>
                 </div>
 
+                <DetailCard title="WorkJam Voice Guidance" icon={Wand2}>
+                  <div className="space-y-2">
+                    <p><strong>Voice:</strong> plain-spoken, strategic, practical, and credible.</p>
+                    <p><strong>Frame:</strong> business problem first, product mechanics second, measurable value third.</p>
+                    <p><strong>Primary value lever:</strong> {inferPrimaryValueLever(selectedStory)}</p>
+                    <p className="text-neutral-500 dark:text-neutral-400">
+                      Avoid generic SaaS language. Position WorkJam as the frontline execution layer that connects communication, tasks, learning, scheduling, analytics, and integrations.
+                    </p>
+                  </div>
+                </DetailCard>
+
                 <DetailCard title="Modules & Trigger Phrases" icon={MessageSquare}>
                   <div className="mb-3">
                     <p className="text-[10px] uppercase tracking-widest font-mono text-neutral-400 mb-1">Modules</p>
@@ -751,13 +931,34 @@ export default function App() {
                 )}
 
                 <div className={`p-4 rounded-xl border ${darkMode ? "bg-neutral-900 border-neutral-800" : "bg-neutral-50 border-neutral-200 shadow-sm"}`}>
-                  <div className="flex items-center justify-between border-b pb-2.5 mb-3 border-neutral-200 dark:border-neutral-800">
-                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest font-mono flex items-center gap-1.5"><Wand2 size={12} />Copy Builder</span>
-                    <div className="flex gap-1 flex-wrap justify-end">
-                      <ModeButton mode="talkTrack" label="Talk" active={copyMode} setActive={setCopyMode} />
-                      <ModeButton mode="discovery" label="Questions" active={copyMode} setActive={setCopyMode} />
-                      <ModeButton mode="proof" label="Proof" active={copyMode} setActive={setCopyMode} />
-                      <ModeButton mode="demo" label="Demo" active={copyMode} setActive={setCopyMode} />
+                  <div className="flex flex-col gap-3 border-b pb-3 mb-3 border-neutral-200 dark:border-neutral-800">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest font-mono flex items-center gap-1.5"><Wand2 size={12} />Copy Builder</span>
+                      <div className="flex gap-1 flex-wrap justify-end">
+                        <ModeButton mode="talkTrack" label="Talk" active={copyMode} setActive={setCopyMode} />
+                        <ModeButton mode="discovery" label="Questions" active={copyMode} setActive={setCopyMode} />
+                        <ModeButton mode="proof" label="Proof" active={copyMode} setActive={setCopyMode} />
+                        <ModeButton mode="demo" label="Demo" active={copyMode} setActive={setCopyMode} />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2 items-center">
+                      <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest font-mono">Voice Mode</label>
+                      <select
+                        value={voiceMode}
+                        onChange={(event) => setVoiceMode(event.target.value)}
+                        className="w-full py-1.5 px-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs font-semibold focus:outline-none text-neutral-700 dark:text-neutral-300"
+                      >
+                        {VOICE_MODES.map((voice) => (
+                          <option key={voice.id} value={voice.id}>
+                            {voice.label} — {voice.description}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white/60 dark:bg-neutral-950/40 p-2 text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
+                      {WORKJAM_VOICE_RULES[voiceMode]?.frame}
                     </div>
                   </div>
                   <div className="p-3 bg-white dark:bg-[#121212] border border-neutral-200 dark:border-neutral-800 rounded-lg max-h-[300px] overflow-y-auto font-mono text-[11px] leading-relaxed text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">
@@ -881,4 +1082,3 @@ function ModeButton({ mode, label, active, setActive }) {
     </button>
   );
 }
-
