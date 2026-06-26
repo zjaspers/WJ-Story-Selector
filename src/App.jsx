@@ -877,7 +877,7 @@ export default function App() {
       {isStoryBoardMode ? (
         <div className="h-[calc(100dvh-4rem)] min-h-0 w-full grid grid-cols-1 lg:grid-cols-[420px_minmax(0,1fr)] overflow-hidden">
           {storyListColumn}
-          <main className="h-full min-h-0 min-w-0 overflow-hidden p-4 bg-white dark:bg-[#121212]">
+          <main className="h-full min-h-0 min-w-0 overflow-hidden p-4 flex flex-col bg-white dark:bg-[#121212]">
             <StoryBoardColumns
               stories={storyBoardStories}
               combinedCopy={storyBoardCopy}
@@ -1037,7 +1037,7 @@ function StoryBoardColumns({ stories, combinedCopy, copiedId, onCopy, onOpenStor
   ]).slice(0, 6);
 
   return (
-    <div className="h-full min-h-0 min-w-0 rounded-2xl border border-blue-200 dark:border-blue-500/30 bg-blue-50/50 dark:bg-blue-500/10 p-4 flex flex-col overflow-hidden">
+    <div className="flex-1 min-h-0 min-w-0 rounded-2xl border border-blue-200 dark:border-blue-500/30 bg-blue-50/50 dark:bg-blue-500/10 p-4 flex flex-col overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
           <h3 className="text-sm font-extrabold text-neutral-900 dark:text-white tracking-tight">
@@ -1071,7 +1071,9 @@ function StoryBoardColumns({ stories, combinedCopy, copiedId, onCopy, onOpenStor
       <div
         className="flex-1 min-h-0 min-w-0 grid gap-3 overflow-x-auto overflow-y-hidden pb-2"
         style={{
-          gridTemplateColumns: `repeat(${stories.length}, minmax(260px, 1fr)) minmax(320px, 1.15fr)`
+          gridTemplateColumns: `repeat(${stories.length}, minmax(260px, 1fr)) minmax(320px, 1.15fr)`,
+          gridTemplateRows: "1fr",
+          alignItems: "stretch"
         }}
       >
         {stories.map((story, index) => (
